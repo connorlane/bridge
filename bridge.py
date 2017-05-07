@@ -88,11 +88,14 @@ class Dude:
     dudeList = []
     idCounter = 0
 
-    def __init__(self, color, speed, startPosition):
+    def __init__(self, color, speed, startPosition, swaggerRate):
         self.id = Dude.idCounter
         Dude.idCounter = Dude.idCounter + 1
         self.state = State.NONE
         self.inqueue = []
+        self.swaggerRate = swaggerRate
+        self.swaggerVelocity = (0, 0)
+        self.swaggerCoords = (0, 0)
         self.outqueue = []
         self.color = color
         self.speed = speed
@@ -115,6 +118,14 @@ class Dude:
         otherDude.inqueue.insert(0, m)
 
     def timeStep(self, t):
+
+        self.swaggerVelocity = (self.swaggerVelocity[0] - (self.swaggerCoords[0]+8*random.random())*self.swaggerRate*t - 0.001*self.swaggerVelocity[0],
+                           self.swaggerVelocity[1] - (self.swaggerCoords[1]+8*random.random())*self.swaggerRate*t - 0.001*self.swaggerVelocity[1])
+
+        self.swaggerCoords = (self.swaggerCoords[0] + self.swaggerVelocity[0],
+                         self.swaggerCoords[1] + self.swaggerVelocity[1])
+
+
         if self.state == State.AWAITING_CS:
             m = self.receiveMessage()
             while m:
@@ -138,9 +149,10 @@ class Dude:
                 elif awaiting == 1:
                     dudesGoingMyDirection = dudesGoingMyDirection + 1
 
-            if not stillWaiting and dudesGoingMyDirection < 3:
+            if not stillWaiting and dudesGoingMyDirection < 2:
                 # Send messages to all my dudes letting them know I'm going
                 #     into the crit section
+                print self.id, "enters the critical section"
                 for mydude in self.respondList:
                     Dude.sendMessage(mydude, (self, 'c', self.direction))
                 self.state = State.IN_CS
@@ -155,7 +167,7 @@ class Dude:
             self.position = (self.position + self.speed * t) % 1.0
             coords, criticalSection, i = getPosition(self.position)
             if criticalSection:
-                self.coords = self.coords[0] + randint(-15,15), self.coords[1] + randint(-15,15)
+                #self.coords = self.coords[0] + randint(-15,15), self.coords[1] + randint(-15,15)
                 self.state = State.AWAITING_CS
                 self.direction = i
                 for dude in Dude.dudeList:
@@ -170,6 +182,7 @@ class Dude:
             m = self.receiveMessage()
             while m:
                 if m[1] == 'p':
+                    Dude.sendMessage(m[0], (self, 'c', self.direction))
                     self.respondList.insert(0, m[0])
                 m = self.receiveMessage()
 
@@ -182,7 +195,11 @@ class Dude:
                     
     def draw(self, w):
         x, y = self.coords
+        swag_x, swag_y = self.swaggerCoords
+        x = x + swag_x
+        y = y + swag_y
         w.create_oval(x-self.RADIUS, y-self.RADIUS, x+self.RADIUS, y+self.RADIUS, fill=self.color)
+        w.create_text(x, y, text=str(self.id))
 
 def randomColor():
     de=("%02x"%randint(0,255))
@@ -194,9 +211,9 @@ def randomColor():
 
 t = 1.5
 
-for _ in xrange(0, 10): 
+for _ in xrange(0, 8): 
     startPosition = choice([random.uniform(0.3, 0.5), random.uniform(0.8, 1.0)])
-    Dude.dudeList.append(Dude(randomColor(), 0.001, startPosition))
+    Dude.dudeList.append(Dude(randomColor(), 0.001, startPosition, 0.005))
 
 while True:
     master.after(10)
