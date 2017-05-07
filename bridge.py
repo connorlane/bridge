@@ -81,7 +81,7 @@ def getPosition(x):
                          p1[1] + distance * (p2[1] - p1[1]) / segmentLength)
             done = True
 
-    return position, criticalSection
+    return position, criticalSection, i
 
 class Dude:
     RADIUS = 7
@@ -97,7 +97,7 @@ class Dude:
         self.color = color
         self.speed = speed
         self.position = startPosition
-        self.coords, _ = getPosition(0)
+        self.coords, _, _ = getPosition(0)
         self.awaitingReply = dict()
         self.respondList = []
         for dude in Dude.dudeList:
@@ -119,7 +119,9 @@ class Dude:
             m = self.receiveMessage()
             while m:
                 if m[1] == 'v':
-                    self.awaitingReply[m[0]] = False
+                    self.awaitingReply[m[0]] = 2
+                elif m[1] == 'c' and m[2] == self.direction:
+                    self.awaitingReply[m[0]] = 1
                 elif m[1] == 'p':
                     if m[1] < self.id:
                         sendMessage(dude, (self, 'v'))
@@ -127,12 +129,20 @@ class Dude:
                         self.respondList.insert(0, m[0])
                 m = self.receiveMessage()
 
+            dudesGoingMyDirection = 0
             stillWaiting = False
             for _, awaiting in self.awaitingReply.iteritems():
-                if awaiting == True:
+                if awaiting == 0:
                     stillWaiting = True
                     break
-            if not stillWaiting:
+                elif awaiting == 1:
+                    dudesGoingMyDirection = dudesGoingMyDirection + 1
+
+            if not stillWaiting and dudesGoingMyDirection < 3:
+                # Send messages to all my dudes letting them know I'm going
+                #     into the crit section
+                for mydude in self.respondList:
+                    Dude.sendMessage(mydude, (self, 'c', self.direction))
                 self.state = State.IN_CS
 
         elif self.state == State.NONE:
@@ -143,17 +153,19 @@ class Dude:
                 m = self.receiveMessage()
 
             self.position = (self.position + self.speed * t) % 1.0
-            coords, criticalSection = getPosition(self.position)
+            coords, criticalSection, i = getPosition(self.position)
             if criticalSection:
                 self.coords = self.coords[0] + randint(-15,15), self.coords[1] + randint(-15,15)
                 self.state = State.AWAITING_CS
+                self.direction = i
                 for dude in Dude.dudeList:
                     if dude == self:
                         continue
                     Dude.sendMessage(dude, (self, 'p'))
-                    self.awaitingReply[dude] = True
+                    self.awaitingReply[dude] = 0
             else:
                 self.coords = coords
+
         elif self.state == State.IN_CS:
             m = self.receiveMessage()
             while m:
@@ -162,7 +174,7 @@ class Dude:
                 m = self.receiveMessage()
 
             self.position = (self.position + self.speed * t) % 1.0
-            self.coords, criticalSection = getPosition(self.position)
+            self.coords, criticalSection, _ = getPosition(self.position)
             if not criticalSection:
                 while len(self.respondList) > 0:
                     Dude.sendMessage(self.respondList.pop(), (self, 'v'))
