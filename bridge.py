@@ -144,6 +144,7 @@ class Dude:
             self.position = (self.position + self.speed * t) % 1.0
             coords, criticalSection = getPosition(self.position)
             if criticalSection:
+                self.coords = self.coords[0] + randint(-20,20), self.coords[1] + randint(-20,20)
                 self.state = State.AWAITING_CS
                 for dude in Dude.dudeList:
                     if dude == self:
@@ -181,9 +182,9 @@ def randomColor():
 
 t = 1
 
-Dude.dudeList.append(Dude(randomColor(), 0.001))
-Dude.dudeList.append(Dude(randomColor(), 0.002))
-Dude.dudeList.append(Dude(randomColor(), 0.003))
+for _ in xrange(0, 10):
+    Dude.dudeList.append(Dude(randomColor(), 0.001))
+
 while True:
     master.after(10)
     w.delete("all")
