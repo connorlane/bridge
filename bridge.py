@@ -2,7 +2,8 @@ from Tkinter import *
 import numpy as np
 import math
 from enum import Enum
-from random import randint
+from random import randint, choice
+import random
 import copy
 
 master = Tk()
@@ -87,7 +88,7 @@ class Dude:
     dudeList = []
     idCounter = 0
 
-    def __init__(self, color, speed):
+    def __init__(self, color, speed, startPosition):
         self.id = Dude.idCounter
         Dude.idCounter = Dude.idCounter + 1
         self.state = State.NONE
@@ -95,7 +96,7 @@ class Dude:
         self.outqueue = []
         self.color = color
         self.speed = speed
-        self.position = 0
+        self.position = startPosition
         self.coords, _ = getPosition(0)
         self.awaitingReply = dict()
         self.respondList = []
@@ -144,7 +145,7 @@ class Dude:
             self.position = (self.position + self.speed * t) % 1.0
             coords, criticalSection = getPosition(self.position)
             if criticalSection:
-                self.coords = self.coords[0] + randint(-20,20), self.coords[1] + randint(-20,20)
+                self.coords = self.coords[0] + randint(-15,15), self.coords[1] + randint(-15,15)
                 self.state = State.AWAITING_CS
                 for dude in Dude.dudeList:
                     if dude == self:
@@ -157,7 +158,6 @@ class Dude:
             m = self.receiveMessage()
             while m:
                 if m[1] == 'p':
-                    print "respondlist", self.respondList
                     self.respondList.insert(0, m[0])
                 m = self.receiveMessage()
 
@@ -180,10 +180,11 @@ def randomColor():
     color=ge+de+re+we
     return color
 
-t = 1
+t = 1.5
 
-for _ in xrange(0, 10):
-    Dude.dudeList.append(Dude(randomColor(), 0.001))
+for _ in xrange(0, 10): 
+    startPosition = choice([random.uniform(0.3, 0.5), random.uniform(0.8, 1.0)])
+    Dude.dudeList.append(Dude(randomColor(), 0.001, startPosition))
 
 while True:
     master.after(10)
