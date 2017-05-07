@@ -98,6 +98,7 @@ class Dude:
         self.position = 0
         self.coords, _ = getPosition(0)
         self.awaitingReply = dict()
+        self.respondList = []
         for dude in Dude.dudeList:
             if dude != self:
                 self.awaitingReply[dude] = False
@@ -155,23 +156,34 @@ class Dude:
             m = self.receiveMessage()
             while m:
                 if m[1] == 'p':
+                    print "respondlist", self.respondList
                     self.respondList.insert(0, m[0])
+                m = self.receiveMessage()
 
             self.position = (self.position + self.speed * t) % 1.0
-            coords, criticalSection = getPosition(self.position)
+            self.coords, criticalSection = getPosition(self.position)
             if not criticalSection:
                 while len(self.respondList) > 0:
-                    sendMessage(self.respondList.pop(), (self, 'v'))
+                    Dude.sendMessage(self.respondList.pop(), (self, 'v'))
                 self.state = State.NONE
                     
     def draw(self, w):
         x, y = self.coords
         w.create_oval(x-self.RADIUS, y-self.RADIUS, x+self.RADIUS, y+self.RADIUS, fill=self.color)
 
+def randomColor():
+    de=("%02x"%randint(0,255))
+    re=("%02x"%randint(0,255))
+    we=("%02x"%randint(0,255))
+    ge="#"
+    color=ge+de+re+we
+    return color
+
 t = 1
-Dude.dudeList.append(Dude("red", 0.001))
-Dude.dudeList.append(Dude("green", 0.002))
-Dude.dudeList.append(Dude("blue", 0.003))
+
+Dude.dudeList.append(Dude(randomColor(), 0.001))
+Dude.dudeList.append(Dude(randomColor(), 0.002))
+Dude.dudeList.append(Dude(randomColor(), 0.003))
 while True:
     master.after(10)
     w.delete("all")
@@ -182,7 +194,6 @@ while True:
         dude.draw(w)
 
     w.update()
-
 
 mainloop()
 
