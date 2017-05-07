@@ -110,17 +110,17 @@ class Dude:
     def receiveMessage(self):
         if len(self.inqueue) > 0:
             m = self.inqueue.pop()
-            print "Message Received: ", m[0].id, self.id, m[1]
+            #print "Message Received: ", m[0].id, self.id, m[1]
             return m
 
     def sendMessage(otherDude, m):
-        print "Message Sent: ",  m[0].id, otherDude.id, m[1]
+        #print "Message Sent: ",  m[0].id, otherDude.id, m[1]
         otherDude.inqueue.insert(0, m)
 
     def timeStep(self, t):
 
-        self.swaggerVelocity = (self.swaggerVelocity[0] - (self.swaggerCoords[0]+8*random.random())*self.swaggerRate*t - 0.001*self.swaggerVelocity[0],
-                           self.swaggerVelocity[1] - (self.swaggerCoords[1]+8*random.random())*self.swaggerRate*t - 0.001*self.swaggerVelocity[1])
+        self.swaggerVelocity = (self.swaggerVelocity[0] - self.swaggerCoords[0]*self.swaggerRate*t - 0.02*self.swaggerVelocity[0]*t + 0.05*random.uniform(-1, 1)*t,
+                                self.swaggerVelocity[1] - self.swaggerCoords[1]*self.swaggerRate*t - 0.02*self.swaggerVelocity[1]*t + 0.05*random.uniform(-1, 1)*t)
 
         self.swaggerCoords = (self.swaggerCoords[0] + self.swaggerVelocity[0],
                          self.swaggerCoords[1] + self.swaggerVelocity[1])
@@ -149,10 +149,10 @@ class Dude:
                 elif awaiting == 1:
                     dudesGoingMyDirection = dudesGoingMyDirection + 1
 
-            if not stillWaiting and dudesGoingMyDirection < 2:
+            if not stillWaiting and dudesGoingMyDirection < 5:
                 # Send messages to all my dudes letting them know I'm going
                 #     into the crit section
-                print self.id, "enters the critical section"
+                #print self.id, "enters the critical section"
                 for mydude in self.respondList:
                     Dude.sendMessage(mydude, (self, 'c', self.direction))
                 self.state = State.IN_CS
@@ -211,9 +211,9 @@ def randomColor():
 
 t = 1.5
 
-for _ in xrange(0, 8): 
-    startPosition = choice([random.uniform(0.3, 0.5), random.uniform(0.8, 1.0)])
-    Dude.dudeList.append(Dude(randomColor(), 0.001, startPosition, 0.005))
+for _ in xrange(0, 40): 
+    startPosition = choice([random.uniform(0.3, 0.5)]) #random.uniform(0.8, 1.0)])
+    Dude.dudeList.append(Dude(randomColor(), random.uniform(0.001, 0.0015), startPosition, 0.001))
 
 while True:
     master.after(10)
