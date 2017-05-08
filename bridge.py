@@ -6,22 +6,57 @@ from random import randint, choice
 import random
 import copy
 
-# Draw the path on the specified canvas object
-def drawPath():
-    for i in xrange(-1, len(path) - 1):
-        w.create_line(path[i][0], path[i+1][0])
+
+
+## GLOBAL PATH DEFINITION & SETUP ##
+
+# Path critical point definitions
+P1 = (100, 100)
+P2 = (300, 200)
+P3 = (500, 200)
+P4 = (700, 100)
+P5 = (700, 300)
+P6 = (100, 300)
+
+# Enum to specify type of node within the path
+class NodeType(Enum):
+    NORMAL = 1
+    ENTER_CS = 2
+    EXIT_CS = 3
+
+# Path definition. Defines how the points link together to define a loop path.
+#   Also defines the critical section
+path = (
+        (P1, NodeType.NORMAL),
+        (P2, NodeType.ENTER_CS), 
+        (P3, NodeType.EXIT_CS),
+        (P4, NodeType.NORMAL),
+        (P5, NodeType.NORMAL),
+        (P3, NodeType.ENTER_CS),
+        (P2, NodeType.EXIT_CS),
+        (P6, NodeType.NORMAL)
+       )
 
 # Utility function for calculating distance between two 2d points
 def dist(p1, p2):
     return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
 
-# Calculates the total length of the given path
-def getPathLength(p):
-    pathLength = 0
-    for i in xrange(-1, len(path) - 1):
-        pathLength = pathLength + dist(path[i][0], path[i+1][0])
+# Calculate the path length
+pathLength = 0
+for i in xrange(-1, len(path) - 1):
+    pathLength = pathLength + dist(path[i][0], path[i+1][0])
 
-    return pathLength
+
+
+
+
+
+## MAIN FUNCTION / CLASS DEFINITIONS ##
+
+# Draw the path on the specified canvas object
+def drawPath():
+    for i in xrange(-1, len(path) - 1):
+        w.create_line(path[i][0], path[i+1][0])
 
 # Gets coordinates from path position. x represents distance along the loop path.
 #   x is normalized so that 1.0 is one full loop path. 0.5 is half way through the
@@ -29,7 +64,6 @@ def getPathLength(p):
 #   coordinates along the path. Also returns whether or not the position is within
 #   a critical section
 def getCoordinates(x):
-    pathLength = getPathLength(path)
     distance = x * pathLength
     
     i = 0 
@@ -57,11 +91,12 @@ def getCoordinates(x):
 
     return position, criticalSection, i
 
+# Class for the moving blobs, a.k.a. dudes
 class Dude:
     RADIUS = 7
     dudeList = []
     idCounter = 0
-    maxDudesOnBridge = 7
+    maxDudesOnBridge = 3
 
     def __init__(self, color, speed, startPosition, swaggerRate):
         self.id = Dude.idCounter
@@ -153,10 +188,13 @@ class Dude:
             m = self.receiveMessage()
             while m:
                 if m[1] == Dude.MessageCode.NOTIFY_CS_ALLCLEAR:
+                    # Record that the dude has given us the all clear
                     self.awaitingReply[m[0]] = Dude.ReplyState.ALL_CLEAR
                 elif m[1] == Dude.MessageCode.NOTIFY_CS_DIRECTION and m[2] == self.direction:
+                    # This dude is in the CS, but he's going the same direction as us
                     self.awaitingReply[m[0]] = Dude.ReplyState.SAME_DIRECTION
                 elif m[1] == Dude.MessageCode.REQUEST_CS:
+                    # This dude wants to enter the CS, but we can't let him do that, Dave
                     self.respondList.insert(0, m[0])
                 m = self.receiveMessage()
 
@@ -169,6 +207,7 @@ class Dude:
                     stillWaiting = True
                     break
                 elif awaiting == Dude.ReplyState.SAME_DIRECTION:
+                    # Count up the dudes going the same direction as me
                     dudesGoingMyDirection = dudesGoingMyDirection + 1
 
             if not stillWaiting and dudesGoingMyDirection < Dude.maxDudesOnBridge:
@@ -176,6 +215,8 @@ class Dude:
                 #     into the critical section
                 for mydude in self.respondList:
                     self.sendMessage(mydude, (Dude.MessageCode.NOTIFY_CS_DIRECTION, self.direction))
+
+                # Go into the critical section
                 self.state = Dude.State.IN_CS
 
         # STATE: Moving in loop, not awaiting critical section #
@@ -185,37 +226,62 @@ class Dude:
             m = self.receiveMessage()
             while m:
                 if m[1] == Dude.MessageCode.REQUEST_CS:
+                    # We're not trying to get into the CS, so give the go-ahead
                     self.sendMessage(m[0], (Dude.MessageCode.NOTIFY_CS_ALLCLEAR,))
                 m = self.receiveMessage()
 
             # Calculate the current position. Position is normalized so that 1.0 is one full loop
             self.position = (self.position + self.speed * t) % 1.0
             coords, criticalSection, i = getCoordinates(self.position)
+
+            # If we're entering a critical section...
             if criticalSection:
+
+                # Switch states
                 self.state = Dude.State.AWAITING_CS
+
+                # Record which direction we're trying to go
                 self.direction = i
+
+                # For each other dude, send a message to let them know we want in the CS
                 for dude in Dude.dudeList:
                     if dude == self:
                         continue
                     self.sendMessage(dude, (Dude.MessageCode.REQUEST_CS,))
+                    # Load of the ReplyState data structure with the default
+                    #   value of 'no response'
                     self.awaitingReply[dude] = Dude.ReplyState.NO_RESPONSE
             else:
+                # Not in critical section, so update the coordinates to move forward
                 self.coords = coords
 
         # STATE: Currently moving through the CS #
         elif self.state == Dude.State.IN_CS:
+
+            # Check messages
             m = self.receiveMessage()
             while m:
                 if m[1] == Dude.MessageCode.REQUEST_CS:
+                    # Let the requesting dude know what direction I'm going
                     self.sendMessage(m[0], (Dude.MessageCode.NOTIFY_CS_DIRECTION, self.direction))
+
+                    # Record this dude so I can notify him when I leave the CS
                     self.respondList.insert(0, m[0])
+
                 m = self.receiveMessage()
 
+            # Update the position, moving forward through the critical section
             self.position = (self.position + self.speed * t) % 1.0
             self.coords, criticalSection, _ = getCoordinates(self.position)
+
+            # Check if we've exited the critical section
             if not criticalSection:
+                # Let all the dudes who've requested access to the CS know that I'm leaving
+                #   the CS now
                 while len(self.respondList) > 0:
                     self.sendMessage(self.respondList.pop(), (Dude.MessageCode.NOTIFY_CS_ALLCLEAR,))
+
+                # Return to non-cs state
                 self.state = Dude.State.NONE
                 
     # Draw as a circle on the specified canvas object #
@@ -244,42 +310,13 @@ master = Tk()
 w = Canvas(master, width=800, height=400)
 w.pack()
 
-# Path critical point definitions
-P1 = (100, 100)
-P2 = (300, 200)
-P3 = (500, 200)
-P4 = (700, 100)
-P5 = (700, 300)
-P6 = (100, 300)
-
-# Enum to specify type of node within the path
-class NodeType(Enum):
-    NORMAL = 1
-    ENTER_CS = 2
-    EXIT_CS = 3
-
-# Path definition. Defines how the points link together to define a loop path.
-#   Also defines the critical section
-path = (
-        (P1, NodeType.NORMAL),
-        (P2, NodeType.ENTER_CS), 
-        (P3, NodeType.EXIT_CS),
-        (P4, NodeType.NORMAL),
-        (P5, NodeType.NORMAL),
-        (P3, NodeType.ENTER_CS),
-        (P2, NodeType.EXIT_CS),
-        (P6, NodeType.NORMAL)
-       )
-
-# Calculate the path length
-pathLength = getPathLength(path)
-
 # Define a default timestep value
-t = 10
+t = 1.0
 
 # Create N nodes
 for _ in xrange(0, 25): 
-    startPosition = random.uniform(0.3, 0.5)
+    # Generate a random starting point on one side of the bridge
+    startPosition = random.uniform(0.8, 0.99)
     Dude.dudeList.append(Dude(randomColor(), random.uniform(0.001, 0.0015), startPosition, 0.001))
 
 # Main drawing loop
