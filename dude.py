@@ -8,9 +8,9 @@ PARAMETERS = {
         "radius": 8,
         "masterDudeList": [],
         "maxDudesInCS": 2,
-        "swagRateConstant": 0.001,
-        "swagDampingConstant": 0.02,
-        "swagExcitationConstant": 0.05
+        "swagRateConstant": 0.01,
+        "swagDampingConstant": 0.01,
+        "swagExcitationConstant": 0.075
         }
             
 # Class for the moving blobs, a.k.a. dudes
@@ -52,14 +52,14 @@ class Dude:
     def _updateSwagger(self, t):
         self.swaggerVelocity = (
                                 self.swaggerVelocity[0]
-                                - PARAMETERS['swagRateConstant']*self.swaggerCoords[0]*t
-                                - PARAMETERS['swagDampingConstant']*self.swaggerVelocity[0]*t
-                                + PARAMETERS['swagExcitationConstant']*random.uniform(-1, 1)*t,
+                                - PARAMETERS['swagRateConstant']*self.swaggerCoords[0]
+                                - PARAMETERS['swagDampingConstant']*self.swaggerVelocity[0]
+                                + PARAMETERS['swagExcitationConstant']*random.uniform(-1, 1),
 
                                 self.swaggerVelocity[1]
-                                - PARAMETERS['swagRateConstant']*self.swaggerCoords[1]*t
-                                - PARAMETERS['swagDampingConstant']*self.swaggerVelocity[1]*t
-                                + PARAMETERS['swagExcitationConstant']*random.uniform(-1, 1)*t
+                                - PARAMETERS['swagRateConstant']*self.swaggerCoords[1]
+                                - PARAMETERS['swagDampingConstant']*self.swaggerVelocity[1]
+                                + PARAMETERS['swagExcitationConstant']*random.uniform(-1, 1)
                                 )
 
         self.swaggerCoords = (
@@ -223,4 +223,13 @@ class Dude:
         # Draw ID label within the circle
         w.create_text(x, y, text=str(self.id))
 
+    def cleanup(self):
+        # If being destroyed, make sure to notify awaiting dudes that they can enter the CS
+        while len(self.respondList) > 0:
+            mydude = self.respondList.pop()
+            self.sendMessage(mydude, (Dude.MessageCode.NOTIFY_CS_ALLCLEAR,))
+
+    def __del__(self):
+        Dude.idCounter = Dude.idCounter - 1
+        
 
