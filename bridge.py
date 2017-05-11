@@ -1,5 +1,4 @@
 from Tkinter import *
-import numpy as np
 import math
 from enum import Enum
 from random import randint, choice
